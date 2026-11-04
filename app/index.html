@@ -1,0 +1,459 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Zuck — the meta model manager</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #E9ECEB; color: #211D18; font-family: Georgia, 'Times New Roman', serif; }
+  .wrap { max-width: 760px; margin: 0 auto; padding: 28px 18px 60px; }
+  h1 { font-size: 52px; margin: 0 0 6px; letter-spacing: -1px; }
+  .sub { font-size: 18px; color: #5A5348; margin: 0 0 22px; line-height: 1.45; max-width: 65ch; }
+  .panel { background: #fff; border: 1px solid #C9CDCB; border-radius: 14px; padding: 20px; margin-bottom: 16px; }
+  .zuck-stage { text-align: center; }
+  #bubble { min-height: 56px; font-size: 19px; line-height: 1.45; padding: 12px 4px 2px; }
+  label { display: block; font-weight: bold; margin-bottom: 8px; }
+  textarea, input[type="text"], input[type="password"] { font-family: Georgia, serif; font-size: 17px; color: #211D18; background: #fff; border: 1px solid #B9C0BE; border-radius: 10px; padding: 11px 13px; width: 100%; }
+  textarea { min-height: 84px; resize: vertical; }
+  .row { display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+  button { font-family: Georgia, serif; font-size: 17px; cursor: pointer; border-radius: 10px; padding: 11px 18px; border: 1px solid #211D18; background: #fff; color: #211D18; }
+  button.primary { background: #E8A200; border-color: #E8A200; color: #211D18; }
+  button:disabled { opacity: .55; cursor: default; }
+  .hint { color: #5A5348; font-size: 15px; line-height: 1.45; }
+  .hidden { display: none; }
+  .q { font-size: 20px; line-height: 1.45; margin: 0 0 12px; }
+  .prog { color: #5A5348; font-size: 15px; margin-top: 10px; line-height: 1.45; }
+  .goal { font-size: 18px; margin: 0 0 8px; }
+  .card { border: 1px solid #C9CDCB; border-radius: 12px; padding: 15px 16px; margin-top: 12px; }
+  .card h3 { margin: 0 0 6px; font-size: 21px; }
+  .badges { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+  .badge { font-size: 14px; border: 1px solid #B9C0BE; border-radius: 20px; padding: 3px 10px; color: #5A5348; }
+  .badge.model { background: #E8A200; border-color: #E8A200; color: #211D18; font-weight: bold; }
+  .card p, .card li { font-size: 16px; line-height: 1.5; color: #33414a; max-width: 68ch; }
+  .card ul { margin: 6px 0 10px 20px; padding: 0; }
+  .brief { font-size: 15px; line-height: 1.5; color: #5A5348; white-space: pre-wrap; margin: 8px 0; max-width: 68ch; }
+  .result { font-size: 15px; line-height: 1.5; white-space: pre-wrap; background: #E9ECEB; max-width: 68ch; border-radius: 8px; padding: 10px 12px; margin: 8px 0; }
+  .err { color: #8a1f1f; font-size: 16px; line-height: 1.45; }
+  .status { font-size: 16px; font-weight: bold; }
+  .note { font-size: 17px; line-height: 1.5; padding: 6px 0; }
+  .foot { color: #5A5348; font-size: 14px; line-height: 1.5; margin-top: 8px; max-width: 65ch; }
+  @media (max-width: 480px) { h1 { font-size: 40px; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Zuck</h1>
+  <p class="sub">The manager for Meta models. Bring a job, answer what Zuck asks until nothing is unknown, and Zuck plans it, staffs it with the right models, and runs it until it is done.</p>
+
+  <div class="panel" id="authPanel"><div id="authArea"></div></div>
+
+  <div class="panel hidden" id="myPanel">
+    <label>Your saved projects</label>
+    <div id="myList"></div>
+    <div class="row">
+      <button id="newProjectBtn" type="button">New project</button>
+    </div>
+    <p class="hint">Sign in with handoff and your projects save to your account. Exit any time — come back, sign in, and pick up where you left off.</p>
+  </div>
+
+  <div class="panel zuck-stage">
+    <svg id="zuckSvg" width="280" height="250" viewBox="0 0 280 250" role="img" aria-label="Zuck, a cartoon">
+      <path d="M140 178 L 108 178 C 84 178 66 196 62 220 L 62 250 L 218 250 L 218 220 C 214 196 196 178 172 178 Z" fill="#8A8F98"/>
+      <path d="M140 178 L 124 200 L 140 216 L 156 200 Z" fill="#6E737C"/>
+      <path d="M124 200 L 116 232 M156 200 L 164 232" stroke="#5A5E66" stroke-width="3" fill="none" stroke-linecap="round"/>
+      <ellipse cx="62" cy="118" rx="18" ry="26" fill="#E8C39A"/>
+      <ellipse cx="218" cy="118" rx="18" ry="26" fill="#E8C39A"/>
+      <path d="M140 22 C 84 22 56 60 56 108 C 56 158 92 192 140 192 C 188 192 224 158 224 108 C 224 60 196 22 140 22 Z" fill="#E8C39A"/>
+      <path d="M56 96 C 48 52 84 18 140 18 C 196 18 232 52 224 96 C 218 66 206 48 196 44 C 200 58 196 66 188 70 C 150 44 104 44 84 62 C 70 72 62 82 56 96 Z" fill="#2E2620"/>
+      <circle cx="102" cy="112" r="22" fill="#fff"/>
+      <circle cx="178" cy="112" r="22" fill="#fff"/>
+      <g id="pupils">
+        <circle id="pupilL" cx="102" cy="112" r="8" fill="#211D18"/>
+        <circle id="pupilR" cx="178" cy="112" r="8" fill="#211D18"/>
+      </g>
+      <g id="lids" opacity="0">
+        <rect x="78" y="88" width="48" height="12" rx="6" fill="#E8C39A"/>
+        <rect x="154" y="88" width="48" height="12" rx="6" fill="#E8C39A"/>
+      </g>
+      <path d="M84 84 q 14 -8 28 0 M168 84 q 14 -8 28 0" stroke="#211D18" stroke-width="4" fill="none" stroke-linecap="round"/>
+      <path d="M140 118 q -4 14 0 22 M140 140 q -6 4 -12 2" stroke="#B98A5E" stroke-width="3" fill="none" stroke-linecap="round"/>
+      <path d="M116 162 q 24 14 48 0" stroke="#211D18" stroke-width="4" fill="none" stroke-linecap="round"/>
+    </svg>
+    <div id="bubble">Got a job? Tell me what you want built and I will run it.</div>
+  </div>
+
+  <div class="panel" id="startPanel">
+    <label for="requestInput">What do you want built?</label>
+    <textarea id="requestInput" placeholder="Like: a handoff miniapp where visitors hire agents, or a tool that turns field photos into repair reports"></textarea>
+    <div class="row">
+      <button id="startBtn" class="primary" type="button">Start the job</button>
+    </div>
+    <p class="hint">Zuck will ask about everything it does not know yet. Answer, skip what does not matter, or say plan it whenever you are ready.</p>
+  </div>
+
+  <div class="panel hidden" id="qaPanel">
+    <p class="q" id="questionText"></p>
+    <textarea id="answerInput" placeholder="Answer in plain words"></textarea>
+    <div class="row">
+      <button id="answerBtn" class="primary" type="button">Answer</button>
+      <button id="skipBtn" type="button">Skip</button>
+      <button id="planNowBtn" type="button">Just plan it</button>
+    </div>
+    <div class="prog" id="progressText"></div>
+    <div class="row hidden" id="makePlanRow">
+      <button id="makePlanBtn" class="primary" type="button">Make the plan</button>
+    </div>
+  </div>
+
+  <div class="panel hidden" id="planPanel">
+    <div class="row">
+      <label for="keyInput" style="margin:0;">Your Meta Model API key (optional, for running model tasks)</label>
+    </div>
+    <input id="keyInput" type="password" placeholder="Paste your key here — it lives only in this page and is sent only with a run">
+    <p class="hint">Without a key, Zuck still plans everything and writes every brief — model tasks just wait with their brief ready. Zuck never stores your key, never logs it, and never puts it in a saved file. It is gone when you reload.</p>
+    <div class="row">
+      <button id="runBtn" class="primary" type="button">Run the plan</button>
+      <button id="refreshBtn" type="button">Refresh</button>
+    </div>
+    <div class="prog" id="statusText"></div>
+    <div class="prog" id="linkText"></div>
+    <div id="goalsBox"></div>
+    <div id="tasksBox"></div>
+  </div>
+
+  <p class="foot">Zuck plans with Meta models: Spark for text at light, standard, or deep effort, Wonder for the hardest planning and review, Image for pictures, SAM 3.1 for vision, and you for the calls only a human makes. Gates hold: a task never starts until the work it depends on is done. Independent tasks run together.</p>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  var pid = null, project = null, PROJECT_SAVED = false;
+  var pollTimer = null, lastStatusKey = '', sameCount = 0;
+  function statusKey() {
+    if (!project || !project.plan) return '';
+    return project.plan.tasks.map(function (t) { return t.id + ':' + t.status; }).join('|');
+  }
+  function stopWatching() { if (pollTimer) { clearInterval(pollTimer); pollTimer = null; } }
+  function watchRun() {
+    stopWatching();
+    lastStatusKey = statusKey(); sameCount = 0;
+    pollTimer = setInterval(function () {
+      if (!pid) { stopWatching(); return; }
+      callU('project', withSid({ pid: pid })).then(function (j) {
+        if (j && j.ok) {
+          project = j.project; render();
+          var k = statusKey();
+          if (k === lastStatusKey) {
+            sameCount++;
+            if (sameCount >= 2) { stopWatching(); say('Run settled — check what is still waiting below.'); }
+          } else { lastStatusKey = k; sameCount = 0; }
+        }
+      }).catch(function () {});
+    }, 4000);
+  }
+  var SID = null, USERNAME = null;
+  var OAUTH_CLIENT_ID = 'hoc_dTvjAOBpbWg-rRX_D8x9oJVb';
+  var AUTHORIZE_URL = 'https://handoff.lol/oauth/authorize';
+  // Interim publish path is /app/amuse/zuck; when Zuck publishes as its own
+  // agent this becomes https://handoff.lol/app/zuck/zuck (republish then).
+  var REDIRECT_URI = 'https://handoff.lol/app/amuse/zuck';
+  function b64url(buf) {
+    var str = '', bytes = new Uint8Array(buf);
+    for (var i = 0; i < bytes.length; i++) str += String.fromCharCode(bytes[i]);
+    return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+  function newSid() { return 's-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10); }
+  function withSid(d) { d = d || {}; if (SID) d.sid = SID; return d; }
+  function showUser() {
+    var area = $('authArea');
+    clear(area);
+    if (USERNAME) {
+      var span = el('span', 'as @' + USERNAME + '  ', null);
+      area.appendChild(span);
+      var out = el('button', 'Sign out'); out.type = 'button';
+      out.addEventListener('click', signOut);
+      area.appendChild(out);
+      $('myPanel').classList.remove('hidden');
+    } else {
+      var btn = el('button', 'Sign in with handoff', 'primary'); btn.type = 'button';
+      btn.addEventListener('click', signIn);
+      area.appendChild(btn);
+      $('myPanel').classList.add('hidden');
+    }
+  }
+  async function signIn() {
+    var vb = new Uint8Array(32); crypto.getRandomValues(vb);
+    var verifier = b64url(vb);
+    var digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier));
+    var challenge = b64url(digest);
+    var nb = new Uint8Array(8); crypto.getRandomValues(nb);
+    var sid = newSid();
+    var state = sid + '.' + verifier + '.' + b64url(nb);
+    var q = 'response_type=code' + '&client_id=' + encodeURIComponent(OAUTH_CLIENT_ID)
+      + '&redirect_uri=' + encodeURIComponent(REDIRECT_URI)
+      + '&scope=' + encodeURIComponent('mcp')
+      + '&state=' + encodeURIComponent(state)
+      + '&code_challenge=' + encodeURIComponent(challenge)
+      + '&code_challenge_method=S256';
+    location.href = AUTHORIZE_URL + '?' + q;
+  }
+  function signOut() {
+    stopWatching();
+    if (SID) callU('signout', { sid: SID }).catch(function () {});
+    SID = null; USERNAME = null; pid = null; project = null; PROJECT_SAVED = false;
+    try { history.replaceState(null, '', location.pathname); } catch (e) {}
+    $('startPanel').classList.remove('hidden');
+    $('qaPanel').classList.add('hidden');
+    $('planPanel').classList.add('hidden');
+    showUser();
+    say('Signed out. Your saved projects are still on your account for next time.');
+  }
+  function loadMyProjects(list) {
+    var box = $('myList');
+    clear(box);
+    if (!list || !list.length) {
+      box.appendChild(el('div', 'No saved projects yet. Start one below and it saves here.', 'hint'));
+      return;
+    }
+    list.forEach(function (it) {
+      var row = el('div', null, 'row');
+      var b = el('button', it.request.length > 60 ? it.request.slice(0, 57) + '...' : it.request);
+      b.type = 'button';
+      b.addEventListener('click', function () { openProject(it.id); });
+      row.appendChild(b);
+      row.appendChild(el('span', it.status, 'badge'));
+      box.appendChild(row);
+    });
+  }
+  function openProject(id) {
+    callU('project', withSid({ pid: id })).then(function (j) {
+      if (j && j.ok) {
+        pid = j.project.id; project = j.project; PROJECT_SAVED = !!SID;
+        $('startPanel').classList.add('hidden');
+        render();
+        say('Opened your saved project.');
+        if (project.status === 'running') watchRun();
+      }
+    });
+  }
+  function setUrlForProject() {
+    try {
+      var q = '?pid=' + encodeURIComponent(pid) + (SID ? '&sid=' + encodeURIComponent(SID) : '');
+      history.replaceState(null, '', location.pathname + q);
+    } catch (e) {}
+  }
+  async function handleAuthCallback() {
+    var q;
+    try { q = new URLSearchParams(location.search); } catch (e) { return; }
+    var code = q.get('code'), state = q.get('state');
+    if (code && state) {
+      try { history.replaceState(null, '', location.pathname); } catch (e) {}
+      var parts = String(state).split('.');
+      if (parts.length >= 2 && parts[0] && parts[1]) {
+        var d = await callU('oauth-exchange', { code: code, verifier: parts[1], sid: parts[0], redirect_uri: REDIRECT_URI }).catch(function () { return null; });
+        if (d && d.ok) {
+          SID = parts[0]; USERNAME = d.user || null;
+          try { history.replaceState(null, '', location.pathname + '?sid=' + encodeURIComponent(SID)); } catch (e) {}
+          showUser(); loadMyProjects(d.projects || []);
+          say(USERNAME ? 'Signed in as @' + USERNAME + '.' : 'Signed in.');
+          return;
+        }
+        say('Sign-in did not go through — try again.');
+      }
+    }
+    var sid = q.get('sid');
+    if (sid) {
+      var s = await callU('session', { sid: sid }).catch(function () { return null; });
+      if (s && s.ok) {
+        SID = sid; USERNAME = s.user || null;
+        showUser(); loadMyProjects(s.projects || []);
+        var ppid = q.get('pid');
+        if (ppid) { openProject(ppid); return; }
+      } else {
+        try { history.replaceState(null, '', location.pathname); } catch (e) {}
+      }
+    } else {
+      var onlyPid = q.get('pid');
+      if (onlyPid) { openProject(onlyPid); return; }
+    }
+    showUser();
+  }
+
+  function callU(action, data) {
+    return fetch('https://tunnel.handoff.lol/t/amuse/u', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ app: 'zuck', from: 'visitor', to: 'server', action: action, data: data || {} })
+    }).then(function (r) { return r.json(); });
+  }
+  function say(text) { $('bubble').textContent = text; }
+  function el(tag, text, cls) {
+    var n = document.createElement(tag);
+    if (text != null) n.textContent = text;
+    if (cls) n.className = cls;
+    return n;
+  }
+  function clear(n) { while (n.firstChild) n.removeChild(n.firstChild); }
+
+  var pupilL = $('pupilL'), pupilR = $('pupilR'), lids = $('lids');
+  document.addEventListener('mousemove', function (e) {
+    var r = $('zuckSvg').getBoundingClientRect();
+    var cx = Math.max(-1, Math.min(1, (e.clientX - (r.left + r.width / 2)) / r.width));
+    var cy = Math.max(-1, Math.min(1, (e.clientY - (r.top + 112)) / 230));
+    pupilL.setAttribute('cx', 102 + cx * 7); pupilL.setAttribute('cy', 112 + cy * 5);
+    pupilR.setAttribute('cx', 178 + cx * 7); pupilR.setAttribute('cy', 112 + cy * 5);
+  });
+  setInterval(function () {
+    lids.setAttribute('opacity', '1');
+    setTimeout(function () { lids.setAttribute('opacity', '0'); }, 160);
+  }, 4200);
+
+  function modelBadge(t) {
+    var names = { spark: 'Spark', wonder: 'Wonder', image: 'Image', sam: 'SAM 3.1', user: 'You' };
+    var b = el('span', names[t.model] + (t.effort ? ' · ' + t.effort : ''), 'badge model');
+    return b;
+  }
+  function render() {
+    if (!project) return;
+    var status = project.status;
+    $('qaPanel').classList.toggle('hidden', !(status === 'clarifying' || status === 'ready_to_plan'));
+    $('planPanel').classList.toggle('hidden', !project.plan);
+    if (project.question) {
+      $('questionText').textContent = project.question;
+      $('progressText').textContent = 'Answered ' + project.answers.length + ' · still unknown: ' + (project.unknowns.length ? project.unknowns.join(', ') : 'nothing');
+      $('makePlanRow').classList.toggle('hidden', status !== 'ready_to_plan');
+    } else {
+      $('questionText').textContent = 'That is everything Zuck needed.';
+      $('progressText').textContent = 'Answered ' + project.answers.length + ' · still unknown: nothing';
+      $('makePlanRow').classList.toggle('hidden', false);
+    }
+    if (project.plan) {
+      $('statusText').textContent = 'Project status: ' + project.status + (PROJECT_SAVED ? ' · Saved to your account' : '');
+      var linkBox = $('linkText');
+      clear(linkBox);
+      linkBox.appendChild(el('span', 'Project link: ', null));
+      var a = document.createElement('a');
+      a.href = location.origin + location.pathname + '?pid=' + encodeURIComponent(pid) + (SID ? '&sid=' + encodeURIComponent(SID) : '');
+      a.textContent = a.href;
+      linkBox.appendChild(a);
+      setUrlForProject();
+      clear($('goalsBox'));
+      project.plan.goals.forEach(function (g) { $('goalsBox').appendChild(el('p', 'Goal — ' + g.text, 'goal')); });
+      clear($('tasksBox'));
+      var byId = {};
+      project.plan.tasks.forEach(function (t) { byId[t.id] = t; });
+      project.plan.tasks.forEach(function (t) {
+        var card = el('div', null, 'card');
+        card.appendChild(el('h3', t.title));
+        var badges = el('div', null, 'badges');
+        badges.appendChild(modelBadge(t));
+        badges.appendChild(el('span', 'status: ' + t.status, 'badge'));
+        if (t.parallel) badges.appendChild(el('span', 'runs with: ' + t.parallel + ' group', 'badge'));
+        if (t.deps && t.deps.length) badges.appendChild(el('span', 'waits for: ' + t.deps.map(function (d) { return byId[d] ? byId[d].title : d; }).join(', '), 'badge'));
+        card.appendChild(badges);
+        var ul = el('ul', null, null);
+        t.subtasks.forEach(function (s) { ul.appendChild(el('li', s)); });
+        card.appendChild(ul);
+        card.appendChild(el('div', t.brief, 'brief'));
+        if (t.error) card.appendChild(el('div', t.error, 'err'));
+        if (t.status === 'needs_key') card.appendChild(el('div', 'Needs your Meta key — the brief above is ready to run.', 'note'));
+        if (t.status === 'waiting_user') {
+          var cb = el('button', 'Confirm this one');
+          cb.type = 'button';
+          cb.addEventListener('click', function () {
+            callU('confirm', withSid({ pid: pid, taskId: t.id })).then(function (j) {
+              if (j && j.ok) { project = j.project; render(); say('Confirmed. Zuck moves on.'); }
+            });
+          });
+          card.appendChild(cb);
+        }
+        if (t.result) {
+          var full = t.result;
+          var shown = full.length > 800 ? full.slice(0, 800) + '…' : full;
+          var res = el('div', shown, 'result');
+          card.appendChild(res);
+          if (full.length > 800) {
+            var tb = el('button', 'Show full result');
+            tb.type = 'button';
+            tb.addEventListener('click', function () {
+              if (res.textContent === shown) { res.textContent = full; tb.textContent = 'Show less'; }
+              else { res.textContent = shown; tb.textContent = 'Show full result'; }
+            });
+            card.appendChild(tb);
+          }
+        }
+        $('tasksBox').appendChild(card);
+      });
+    }
+  }
+  function fail(msg) { say(msg); }
+
+  $('newProjectBtn').addEventListener('click', function () {
+    stopWatching();
+    pid = null; project = null; PROJECT_SAVED = false;
+    $('requestInput').value = '';
+    $('startPanel').classList.remove('hidden');
+    $('qaPanel').classList.add('hidden');
+    $('planPanel').classList.add('hidden');
+    try { history.replaceState(null, '', location.pathname + (SID ? '?sid=' + encodeURIComponent(SID) : '')); } catch (e) {}
+    say('Fresh project. What do you want built?');
+  });
+  $('startBtn').addEventListener('click', function () {
+    var req = $('requestInput').value.trim();
+    if (!req) { say('Tell Zuck what you want built first.'); return; }
+    callU('start', withSid({ request: req })).then(function (j) {
+      if (j && j.ok) {
+        pid = j.project.id; project = j.project; PROJECT_SAVED = !!SID;
+        $('startPanel').classList.add('hidden');
+        render();
+        say('Got it. Now Zuck needs to know a few things before it plans anything.');
+      } else fail(j && j.error ? j.error : 'Zuck did not start — try again.');
+    }).catch(function () { fail('Zuck did not answer — try again in a bit.'); });
+  });
+  function answer(text) {
+    callU('answer', withSid({ pid: pid, text: text })).then(function (j) {
+      if (j && j.ok) { project = j.project; $('answerInput').value = ''; render(); say('Noted.'); }
+    });
+  }
+  $('answerBtn').addEventListener('click', function () {
+    var t = $('answerInput').value.trim();
+    if (!t) { say('Say something, or skip it.'); return; }
+    answer(t);
+  });
+  $('answerInput').addEventListener('keydown', function (e) { if (e.key === 'Enter') $('answerBtn').click(); });
+  $('skipBtn').addEventListener('click', function () { answer('skip'); });
+  function makePlan() {
+    callU('plan', withSid({ pid: pid })).then(function (j) {
+      if (j && j.ok) { project = j.project; render(); say('Plan is made. Look it over, then run it.'); }
+      else fail(j && j.error ? j.error : 'Plan did not come out — try again.');
+    });
+  }
+  $('planNowBtn').addEventListener('click', makePlan);
+  $('makePlanBtn').addEventListener('click', makePlan);
+  $('runBtn').addEventListener('click', function () {
+    var btn = $('runBtn');
+    btn.disabled = true; btn.textContent = 'Starting…';
+    say('Zuck is starting the run.');
+    callU('run', withSid({ pid: pid, key: $('keyInput').value })).then(function (j) {
+      btn.disabled = false; btn.textContent = 'Run the plan';
+      if (j && j.ok && j.started) {
+        say('Run started — Zuck watches it land here.');
+        watchRun();
+      } else if (j && j.ok) {
+        project = j.project; render();
+        say(j.project.status === 'done' ? 'Done. Every task finished.' : 'Run finished for now — check what is still waiting below.');
+      } else fail(j && j.error ? j.error : 'Run did not go through — try again.');
+    }).catch(function () { btn.disabled = false; btn.textContent = 'Run the plan'; fail('Zuck did not answer — try again in a bit.'); });
+  });
+  $('refreshBtn').addEventListener('click', function () {
+    callU('project', withSid({ pid: pid })).then(function (j) {
+      if (j && j.ok) { project = j.project; render(); say('Refreshed just now.'); }
+    });
+  });
+  handleAuthCallback();
+})();
+</script>
+</body>
+</html>
