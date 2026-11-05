@@ -43,6 +43,7 @@
   .goal .hint { margin: 4px 0 0; }
   .err { color: var(--red); font-family: system-ui, sans-serif; font-size: 14px; margin-top: 10px; }
   .ok { color: var(--accent); font-family: system-ui, sans-serif; font-size: 14px; margin-top: 10px; }
+  .footmark { display: flex; align-items: center; gap: 10px; margin-top: 18px; padding-top: 12px; border-top: 1px solid var(--line); color: var(--muted); font-family: system-ui, sans-serif; font-size: 13px; }
   .foot { color: var(--muted); font-size: 13px; font-family: system-ui, sans-serif; line-height: 1.55; max-width: 68ch; }
   .foot a { color: var(--ink); }
   @media (max-width: 640px) {
@@ -56,23 +57,6 @@
 <body>
 <div class="wrap">
   <header>
-    <svg id="zuckSvg" width="64" height="64" viewBox="0 0 120 120" role="img" aria-label="Zuck">
-      <ellipse cx="15" cy="58" rx="10" ry="15" fill="#E8C39A"/>
-      <ellipse cx="105" cy="58" rx="10" ry="15" fill="#E8C39A"/>
-      <path d="M60 12 C 36 12 24 32 24 58 C 24 86 40 102 60 102 C 80 102 96 86 96 58 C 96 32 84 12 60 12 Z" fill="#E8C39A"/>
-      <path d="M24 54 C 20 28 36 8 60 8 C 84 8 100 28 96 54 C 94 36 90 26 84 22 C 86 32 83 38 78 40 C 64 26 48 28 38 36 C 32 42 27 48 24 54 Z" fill="#2E2620"/>
-      <path d="M40 16 q 6 -6 12 0 M56 12 q 6 -6 12 0 M72 14 q 6 -5 12 1" stroke="#2E2620" stroke-width="3" fill="none" stroke-linecap="round"/>
-      <path d="M30 44 C 32 34 38 28 46 26 M90 44 C 88 34 82 28 74 26" stroke="#2E2620" stroke-width="3" fill="none" stroke-linecap="round"/>
-      <circle cx="45" cy="58" r="10" fill="#fff"/>
-      <circle cx="75" cy="58" r="10" fill="#fff"/>
-      <circle cx="45" cy="58" r="3.5" fill="#211D18"/>
-      <circle cx="75" cy="58" r="3.5" fill="#211D18"/>
-      <path d="M36 46 q 7 -4 14 0 M70 46 q 7 -4 14 0" stroke="#211D18" stroke-width="2.5" fill="none" stroke-linecap="round"/>
-      <path d="M60 60 q -2 8 0 12 M60 72 q -3 2 -6 1" stroke="#B98A5E" stroke-width="2" fill="none" stroke-linecap="round"/>
-      <path d="M48 84 q 12 7 24 0" stroke="#211D18" stroke-width="2.5" fill="none" stroke-linecap="round"/>
-      <path d="M60 100 L 44 100 C 34 100 28 106 26 112 L 26 120 L 94 120 L 94 112 C 92 106 86 100 76 100 Z" fill="#8A8F98"/>
-      <path d="M52 100 L 60 110 L 68 100" fill="none" stroke="#6E737C" stroke-width="2"/>
-    </svg>
     <div>
       <h1>Zuck</h1>
       <div class="sub">Meta model manager — plans work, staffs it with the right models, runs it to done.</div>
@@ -138,6 +122,24 @@
     <div class="ok hidden" id="planOk"></div>
   </div>
 
+  <div class="footmark">
+    <svg id="zuckMark" width="44" height="44" viewBox="0 0 120 120" role="img" aria-label="Zuck">
+      <ellipse cx="15" cy="58" rx="10" ry="15" fill="#E8C39A"/>
+      <ellipse cx="105" cy="58" rx="10" ry="15" fill="#E8C39A"/>
+      <path d="M60 12 C 36 12 24 32 24 58 C 24 86 40 102 60 102 C 80 102 96 86 96 58 C 96 32 84 12 60 12 Z" fill="#E8C39A"/>
+      <path d="M24 54 C 20 26 36 6 60 6 C 84 6 100 26 96 54 C 94 44 92 40 88 38 C 86 30 80 26 74 28 C 70 20 62 18 56 22 C 50 16 42 18 38 24 C 32 22 26 28 26 36 C 24 42 24 48 24 54 Z" fill="#2E2620"/>
+      <path d="M34 20 q 5 -6 11 -1 M48 14 q 6 -6 12 0 M64 14 q 6 -6 12 1 M78 18 q 5 -5 10 0" stroke="#2E2620" stroke-width="3" fill="none" stroke-linecap="round"/>
+      <path d="M28 52 L 58 52 L 62 52 L 92 52 L 90 68 Q 88 74 80 74 L 70 74 Q 62 74 60 68 Q 58 74 50 74 L 40 74 Q 32 74 30 68 Z" fill="#1A1A1A"/>
+      <path d="M58 56 L 62 56" stroke="#1A1A1A" stroke-width="4" stroke-linecap="round"/>
+      <path d="M28 56 L 16 50 M92 56 L 104 50" stroke="#1A1A1A" stroke-width="3" stroke-linecap="round"/>
+      <path d="M60 74 q -2 8 0 12" stroke="#B98A5E" stroke-width="2" fill="none" stroke-linecap="round"/>
+      <path d="M48 88 q 12 6 24 0" stroke="#211D18" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+      <path d="M60 102 L 44 102 C 34 102 28 108 26 114 L 26 120 L 94 120 L 94 114 C 92 108 86 102 76 102 Z" fill="#8A8F98"/>
+      <path d="M44 104 Q 60 118 76 104" stroke="#D4AF37" stroke-width="3" fill="none"/>
+      <circle cx="60" cy="116" r="2.5" fill="#D4AF37"/>
+    </svg>
+    <span>Zuck — the meta model manager</span>
+  </div>
   <p class="foot">Zuck plans with Meta models: Spark for text at light, standard, or deep effort, Wonder for the hardest planning and review, Image for pictures, SAM 3.1 for vision, and you for the calls only a human makes. Gates hold: a task never starts until the work it depends on is done. Independent tasks run together. <a href="https://github.com/34r7h/zuck">Code on GitHub</a>.</p>
 </div>
 <script>
@@ -299,7 +301,14 @@
   }
 
   // ---- sign-in through handoff's own panel (no redirect, no client id) ----
+  function applyKeyHint() {
+    var k = $('keyInput');
+    if (k) k.placeholder = USERNAME === 'socnet'
+      ? 'Your saved Meta key applies — leave empty to use it'
+      : 'Your Meta Model API key (only needed to run model tasks)';
+  }
   function showUser() {
+    applyKeyHint();
     var area = $('authArea');
     clear(area);
     if (USERNAME) {

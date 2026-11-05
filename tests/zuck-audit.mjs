@@ -18,7 +18,8 @@ await page.goto(URL, { waitUntil: 'domcontentloaded', timeout: 60000 });
 await page.waitForTimeout(1200);
 
 check('hero h1 Zuck', (await page.textContent('h1')) === 'Zuck');
-check('cartoon avatar present in header', (await page.$('#zuckSvg')) !== null);
+check('footer logo mark present', (await page.$('#zuckMark')) !== null);
+check('header carries no avatar', (await page.$('header svg')) === null);
 check('sign-in button present', (await page.textContent('#authArea')).includes('Sign in with handoff'));
 
 // sign-in click on the test page shows a visible, honest note (no panel here)
@@ -102,6 +103,27 @@ await page2.locator('#authArea button').click();
 await page2.waitForTimeout(800);
 check('sign out returns to start panel', !(await page2.$eval('#startPanel', (n) => n.classList.contains('hidden'))));
 await browser2.close();
+
+// ---- socnet saved-key path (dummy server key: proves the path engages) ----
+const socSid = 's-socnet1';
+const sessRaw = JSON.parse((await import('node:fs')).readFileSync('/home/hatch/workspace/handoff-lol/zuck_sessions_test.json', 'utf8'));
+sessRaw[socSid] = { user: 'socnet', ts: new Date().toISOString() };
+(await import('node:fs')).writeFileSync('/home/hatch/workspace/handoff-lol/zuck_sessions_test.json', JSON.stringify(sessRaw));
+let rs = await fetch(base + '/start', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ request: 'socnet saved-key probe', sid: socSid }) }).then((x) => x.json());
+await fetch(base + '/plan', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pid: rs.project.id, sid: socSid }) });
+const browser3 = await chromium.launch({ args: ['--no-sandbox'] });
+const page3 = await (await browser3.newContext({ viewport: { width: 1280, height: 900 } })).newPage();
+await page3.goto(URL + '?sid=' + socSid, { waitUntil: 'domcontentloaded', timeout: 60000 });
+await page3.waitForFunction(() => document.getElementById('authArea').textContent.includes('@socnet'), null, { timeout: 10000 }).catch(() => {});
+check('socnet session restores', (await page3.textContent('#authArea')).includes('@socnet'));
+await page3.locator('#myList button').first().click();
+await page3.waitForSelector('#tasksBody tr', { timeout: 10000 }).catch(() => {});
+check('socnet key hint shown', (await page3.$eval('#keyInput', (n) => n.placeholder)).includes('Your saved Meta key applies'));
+await page3.click('#runBtn');
+await page3.waitForFunction(() => document.getElementById('tasksBody').textContent.includes('error'), null, { timeout: 60000 }).catch(() => {});
+const socBadges = await page3.$$eval('#tasksBody .badge', (ns) => ns.map((n) => n.textContent));
+check('socnet run uses server key (bad dummy key errors, never waits)', socBadges.includes('error') && !socBadges.includes('Needs your Meta key'), socBadges.join(','));
+await browser3.close();
 
 console.log(fail === 0 ? 'AUDIT ALL PASS (' + pass + ' checks)' : 'AUDIT FAILURES: ' + fail + ' of ' + (pass + fail));
 process.exit(fail === 0 ? 0 : 1);

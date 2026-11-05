@@ -35,6 +35,16 @@ tasks land. A run never pretends a model ran.
   token. Project links (`?pid=...`, plus `?sid=` when signed in)
   also reopen a project directly.
 
+## v1.2.0 (2026-11-05)
+
+- The avatar is a small logo mark at the bottom of the page (curly
+  hair, Ray-Bans, gold chain). The rest of the page is the tool:
+  header, saved projects, open questions, goals, task table.
+- Owner testing: when the signed-in user is `socnet` and a run call
+  carries no key, the server uses a key kept in a 0600 file outside
+  the repo (never logged, never returned, never written to state).
+  Everyone else still supplies their own key per run.
+
 ## v1.1.0 (2026-11-05)
 
 - The app is a dense project board now: header with sign-in, saved

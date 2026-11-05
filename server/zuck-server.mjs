@@ -79,6 +79,18 @@ function save() {
 // {sid: {user, ts}}. Sign-in comes from handoff's own panel (HandoffAuth);
 // the browser sends its handoff token once for verification (see
 // session-start) and the token itself is never kept.
+// Owner testing key: when the signed-in user is 'socnet' and a run call
+// carries no key, the server uses this key instead of leaving tasks
+// waiting. It lives in a 0600 file outside the repo, is never logged,
+// never returned in any response, and never written to state. Anyone
+// else still supplies their own key per run. The test server overrides
+// the path with ZUCK_SERVER_KEY_FILE so tests never touch the real key.
+let SERVER_KEY = '';
+try {
+  const kf = process.env.ZUCK_SERVER_KEY_FILE || (process.env.HOME + '/.handoff-lol/meta_model_key');
+  SERVER_KEY = readFileSync(kf, 'utf8').trim();
+} catch {}
+
 function loadSessions() {
   try { const s = JSON.parse(readFileSync(SESSION_FILE, 'utf8')); if (s && typeof s === 'object') return s; } catch {}
   return {};
@@ -343,7 +355,12 @@ export function createZuckHandler() {
       if (!rateOk(ip, 'run', 5, 3600e3)) { json(429, { ok: false, error: 'Boss runs a plan at most 5 times an hour per address' }); return true; }
       if (!p.plan) { json(200, { ok: false, error: 'plan it first' }); return true; }
       if (running.has(p.id)) { json(200, { ok: false, error: 'a run is already going for this project — refresh to see progress' }); return true; }
-      const key = String(j.key || '').trim();
+      let key = String(j.key || '').trim();
+      if (!key && SERVER_KEY) {
+        const sidForRun = String(j.sid || '') || p.owner || '';
+        const sess = sidForRun && loadSessions()[sidForRun];
+        if (sess && sess.user === 'socnet') key = SERVER_KEY;
+      }
       running.add(p.id);
       runPlan(p, key || null).finally(() => running.delete(p.id));
       json(200, { ok: true, started: true, project: publicProject(p), key_used: !!key }); return true;
