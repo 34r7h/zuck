@@ -188,26 +188,23 @@
 
   var pid = null, project = null, PROJECT_SAVED = false;
   var SID = null, USERNAME = null;
-  var pollTimer = null, lastStatusKey = '', sameCount = 0;
+  var pollTimer = null;
   function withSid(d) { d = d || {}; if (SID) d.sid = SID; return d; }
-  function statusKey() {
-    if (!project || !project.plan) return '';
-    return project.plan.tasks.map(function (t) { return t.id + ':' + t.status; }).join('|');
-  }
   function stopWatching() { if (pollTimer) { clearInterval(pollTimer); pollTimer = null; } }
   function watchRun() {
+    // Keep watching while the run is going, however long a model call
+    // takes. Stopping on unchanged polls froze the board mid-run when a
+    // single call outlasted the quiet window. Only a settled board —
+    // every task done or waiting on you — stops the watch.
     stopWatching();
-    lastStatusKey = statusKey(); sameCount = 0;
     pollTimer = setInterval(function () {
       if (!pid) { stopWatching(); return; }
       callU('project', withSid({ pid: pid })).then(function (j) {
         if (j && j.ok) {
           project = j.project; render();
-          var k = statusKey();
-          if (k === lastStatusKey) {
-            sameCount++;
-            if (sameCount >= 2) { stopWatching(); showOk('Run settled — check what is still waiting below.'); }
-          } else { lastStatusKey = k; sameCount = 0; }
+          var tasks = (project.plan && project.plan.tasks) || [];
+          var settled = tasks.length && tasks.every(function (t) { return t.status === 'done' || t.status === 'waiting_user'; });
+          if (settled) { stopWatching(); showOk('Run settled — check what is still waiting below.'); }
         }
       }).catch(function () {});
     }, 4000);
