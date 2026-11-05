@@ -75,10 +75,10 @@ function save() {
 }
 
 // ---------- handoff sign-in sessions (server-side only) ----------
-// A session id rides in the page URL (?sid=...); the bundle uses no browser
-// storage at all. Sessions live here: {sid: {user, ts}}. Tokens never reach
-// the browser: the frontend sends only the OAuth code + verifier, and this
-// server exchanges them at handoff.lol/oauth/token over curl.
+// A session id rides in the page URL (?sid=...). Sessions live here:
+// {sid: {user, ts}}. Sign-in comes from handoff's own panel (HandoffAuth);
+// the browser sends its handoff token once for verification (see
+// session-start) and the token itself is never kept.
 function loadSessions() {
   try { const s = JSON.parse(readFileSync(SESSION_FILE, 'utf8')); if (s && typeof s === 'object') return s; } catch {}
   return {};
@@ -87,33 +87,26 @@ function saveSessions(s) {
   try { const tmp = SESSION_FILE + '.tmp'; writeFileSync(tmp, JSON.stringify(s)); renameSync(tmp, SESSION_FILE); } catch {}
 }
 const newSid = () => 's-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
-const OAUTH_CLIENT_ID = 'hoc_dTvjAOBpbWg-rRX_D8x9oJVb';
-function curlPostJson(url, bodyObj) {
+// Native handoff sign-in (HandoffAuth panel in the miniapp) verified here:
+// the browser sends its handoff token ONCE; this server checks it against
+// handoff's own /api/v1/auth/me and, on success, mints a Zuck session id.
+// The handoff token is used for that one check only — never stored, never
+// logged, never written to state. Sessions on disk hold {user, ts} only.
+function curlGetJson(url, bearer) {
   return new Promise((resolve) => {
-    execFile('curl', ['-s', '-A', UA, '--max-time', '20', '-H', 'content-type: application/json',
-      '-d', JSON.stringify(bodyObj), url], { maxBuffer: 1024 * 1024 }, (err, stdout) => {
+    execFile('curl', ['-s', '-A', UA, '--max-time', '15', '-H', 'Authorization: Bearer ' + bearer, url],
+      { maxBuffer: 1024 * 1024 }, (err, stdout) => {
       if (err) return resolve(null);
       resolve(tolerantParse(stdout));
     });
   });
 }
-async function oauthExchange(code, verifier, redirectUri) {
-  const d = await curlPostJson('https://handoff.lol/oauth/token', {
-    grant_type: 'authorization_code', code, redirect_uri: redirectUri,
-    client_id: OAUTH_CLIENT_ID, code_verifier: verifier,
-  });
-  if (d && d.access_token) return { ok: true, access_token: d.access_token };
-  return { ok: false, error: String((d && (d.error_description || d.error)) || 'exchange failed').slice(0, 200) };
-}
-async function resolveUsername(accessToken) {
-  try {
-    const parts = String(accessToken).split('.');
-    if (parts.length === 3) {
-      const payload = JSON.parse(Buffer.from(parts[1].replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8'));
-      const name = payload.preferred_username || payload.username || payload.name || payload.sub;
-      if (name) return String(name).slice(0, 60);
-    }
-  } catch {}
+async function verifyHandoffToken(token) {
+  const d = await curlGetJson('https://handoff.lol/api/v1/auth/me', token);
+  if (d && d.success && d.user) {
+    const name = d.user.handle || d.user.username || d.user.id;
+    if (name) return String(name).slice(0, 60);
+  }
   return null;
 }
 function sessionProjects(sid) {
@@ -303,7 +296,7 @@ export function createZuckHandler() {
       if (!p || (p.owner && p.owner !== sid)) { json(404, { ok: false, error: 'no such project' }); return true; }
       json(200, { ok: true, project: publicProject(p) }); return true;
     }
-    if (req.method !== 'POST' || !['/zuck/start', '/zuck/answer', '/zuck/plan', '/zuck/run', '/zuck/confirm', '/zuck/oauth-exchange', '/zuck/session', '/zuck/signout'].includes(path)) {
+    if (req.method !== 'POST' || !['/zuck/start', '/zuck/answer', '/zuck/plan', '/zuck/run', '/zuck/confirm', '/zuck/session-start', '/zuck/session', '/zuck/signout'].includes(path)) {
       json(404, { ok: false, error: 'no such zuck action' }); return true;
     }
     const body = await readBody(req, 65536);
@@ -366,17 +359,14 @@ export function createZuckHandler() {
       save();
       json(200, { ok: true, project: publicProject(p) }); return true;
     }
-    if (path === '/zuck/oauth-exchange') {
-      const code = String(j.code || '').slice(0, 500);
-      const verifier = String(j.verifier || '').slice(0, 200);
-      const sid = String(j.sid || '').slice(0, 80);
-      const redirectUri = String(j.redirect_uri || '').slice(0, 300);
-      if (!code || !verifier || !sid || !redirectUri) { json(200, { ok: false, error: 'code, verifier, sid, redirect_uri required' }); return true; }
-      let ex;
-      try { ex = await oauthExchange(code, verifier, redirectUri); }
-      catch (e) { ex = { ok: false, error: 'exchange failed: ' + String(e && e.message || e).slice(0, 120) }; }
-      if (!ex.ok) { json(200, { ok: false, error: ex.error }); return true; }
-      const username = await resolveUsername(ex.access_token);
+    if (path === '/zuck/session-start') {
+      const token = String(j.token || '').slice(0, 2000);
+      if (!token) { json(200, { ok: false, error: 'token required' }); return true; }
+      let username = null;
+      try { username = await verifyHandoffToken(token); }
+      catch (e) { username = null; }
+      if (!username) { json(200, { ok: false, error: 'handoff did not accept that sign-in — try signing in again' }); return true; }
+      const sid = newSid();
       const sessions = loadSessions();
       sessions[sid] = { user: username, ts: nowIso() };
       saveSessions(sessions);

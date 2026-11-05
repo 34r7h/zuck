@@ -24,15 +24,24 @@ tasks land. A run never pretends a model ran.
 - Image and SAM have no verified endpoint in v1, so with a key they
   produce the exact prompt / segmentation spec via Spark, labeled SPEC.
   The artifact itself still needs its own Image / SAM run.
-- Only Wonder's model id (`muse-wonder-1.0`) is verified against
-  Meta's API; the Spark / Image / SAM ids follow the same naming
-  pattern and are shown on every task card.
-- Sign in with handoff to save projects to your account and pick up
-  where you left off. Project links (`?pid=...`) also reopen a project
-  directly. Note: handoff's authorize step currently refuses this
-  client's redirects platform-wide (proven live on Cricket's own
-  sign-in button too), so sign-in lights up again when the platform
-  allows it; the save/exit machinery is otherwise complete.
+- Spark (`muse-spark-1.3`) and Wonder (`muse-wonder-1.0`) are proven
+  against Meta's API with real calls; the Image / SAM ids are shown on
+  every task card and their tasks produce labeled specs (see above).
+- Sign in with handoff's own panel to save projects to your account
+  and pick up where you left off. The panel is handoff's native
+  sign-in (no redirect, no OAuth client): the browser sends its
+  handoff token once, the server verifies it against handoff's own
+  /api/v1/auth/me, mints a Zuck session id, and never keeps the
+  token. Project links (`?pid=...`, plus `?sid=` when signed in)
+  also reopen a project directly.
+
+## v1.1.0 (2026-11-05)
+
+- The app is a dense project board now: header with sign-in, saved
+  projects, open questions, goals with progress, and a task table
+  (task, model, effort, status, waits for, confirm). No toy stage.
+- Server calls retry through tunnel blips (3 attempts) and surface
+  the server's own error instead of a dead end.
 
 ## Layout
 
