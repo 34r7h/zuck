@@ -52,6 +52,21 @@
     table { font-size: 13px; }
     td:nth-child(3), th:nth-child(3) { display: none; }
   }
+  /* Handoff's own sign-in panel (/auth.js) ships no layout of its own — it
+     expects the host page's styles. This bundle is standalone, so the panel's
+     overlay layout lives here; without it the panel renders as an unstyled
+     block below the page content instead of a modal. */
+  .hf-modal { position: fixed; inset: 0; z-index: 1000; overflow-y: auto; background: rgba(24,21,17,.55); padding: 24px 12px; font-family: system-ui, sans-serif; }
+  .hf-modal .hf-box { position: relative; background: #fff; border: 1px solid var(--line); border-radius: 12px; max-width: 420px; margin: 40px auto; padding: 20px; }
+  .hf-modal .hf-x { position: absolute; top: 10px; right: 10px; padding: 6px 10px; }
+  .hf-modal .tabs { display: flex; gap: 8px; margin-bottom: 12px; }
+  .hf-modal .tab.active { background: #e8a100; border-color: #c78a00; font-weight: 600; }
+  .hf-modal input { width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; font-size: 16px; font-family: system-ui, sans-serif; background: #fff; color: var(--ink); }
+  .hf-modal input.otp { width: auto; }
+  .hf-modal .muted { color: var(--muted); font-size: 13.5px; line-height: 1.5; }
+  .hf-modal .err { color: var(--red); font-size: 13.5px; }
+  .hf-modal .ok { color: #0b4d2a; font-size: 13.5px; }
+  .hf-modal summary { cursor: pointer; }
 </style>
 </head>
 <body>
@@ -117,6 +132,8 @@
     </div>
     <p class="hint">Model tasks need your own Meta Model API key. It is sent with the run call only — never stored, never logged. No key means tasks wait with their briefs ready; a bad key surfaces Meta's own error. Image and SAM tasks produce the exact prompt and segmentation spec, labeled SPEC, while their own endpoints are wired up.</p>
     <p class="hint" id="linkText"></p>
+    <p class="hint" id="handoffText"></p>
+    <div class="row hidden" id="mirrorRow"><button id="mirrorBtn" type="button">Put this project on handoff</button></div>
     <p class="hint" id="savedText"></p>
     <div class="err hidden" id="planErr"></div>
     <div class="ok hidden" id="planOk"></div>
@@ -286,6 +303,23 @@
     a.href = location.origin + location.pathname + '?pid=' + encodeURIComponent(pid) + (SID ? '&sid=' + encodeURIComponent(SID) : '');
     a.textContent = a.href;
     linkBox.appendChild(a);
+    var hb = $('handoffText');
+    clear(hb);
+    if (project.handoff && project.handoff.url) {
+      hb.appendChild(el('span', 'On handoff: ', null));
+      var ha = document.createElement('a');
+      ha.href = project.handoff.url; ha.textContent = project.handoff.url;
+      hb.appendChild(ha);
+      if (project.handoff.plan_error) hb.appendChild(el('div', project.handoff.plan_error, 'hint'));
+      $('mirrorRow').classList.add('hidden');
+    } else if (project.plan) {
+      hb.textContent = (project.handoff && project.handoff.error)
+        ? project.handoff.error + ' — try again below.'
+        : 'Not on handoff yet.';
+      $('mirrorRow').classList.remove('hidden');
+    } else {
+      $('mirrorRow').classList.add('hidden');
+    }
     $('savedText').textContent = PROJECT_SAVED ? 'Saved to your account.' : 'Sign in to save this project to your account.';
     setUrlForProject();
     $('startPanel').classList.add('hidden');
@@ -354,10 +388,9 @@
       return;
     }
     try {
-      // Immediate visible feedback on the tap itself, before the panel paints.
-      var area = $('authArea');
-      clear(area);
-      area.appendChild(el('span', 'Opening handoff\u2019s sign-in panel…', null));
+      // The panel is an overlay in this bundle (see .hf-modal above). The
+      // sign-in button stays in place, so closing the panel without signing
+      // in leaves a working button, never a stuck note.
       window.HandoffAuth.openSignIn();
     } catch (e) {
       showErr('startErr', 'Sign-in did not open — try again.');
@@ -429,12 +462,22 @@
     answer(t);
   });
   $('skipBtn').addEventListener('click', function () { answer('skip'); });
+  function handoffToken() {
+    try { return (hasHandoffAuth() && window.HandoffAuth.token) ? (window.HandoffAuth.token() || '') : ''; } catch (e) { return ''; }
+  }
   $('planNowBtn').addEventListener('click', function () {
     hideErr('qaErr');
-    callU('plan', withSid({ pid: pid })).then(function (j) {
+    callU('plan', withSid({ pid: pid, token: handoffToken() })).then(function (j) {
       if (j && j.ok) { project = j.project; render(); }
       else showErr('qaErr', (j && j.error) || 'Plan did not come out — try again.');
     }).catch(function () { showErr('qaErr', 'Could not reach Zuck — check your connection and try again.'); });
+  });
+  $('mirrorBtn').addEventListener('click', function () {
+    hideErr('planErr');
+    callU('mirror', withSid({ pid: pid, token: handoffToken() })).then(function (j) {
+      if (j && j.ok) { project = j.project; render(); showOk('On handoff now — the project link is above.'); }
+      else { if (j && j.project) { project = j.project; render(); } showErr('planErr', (j && j.error) || 'That did not land on handoff — try again.'); }
+    }).catch(function () { showErr('planErr', 'Could not reach Zuck — check your connection and try again.'); });
   });
   $('runBtn').addEventListener('click', function () {
     hideErr('planErr'); hideOk();

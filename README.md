@@ -35,6 +35,25 @@ tasks land. A run never pretends a model ran.
   token. Project links (`?pid=...`, plus `?sid=` when signed in)
   also reopen a project directly.
 
+## v1.2.3 (2026-11-05)
+
+- Plans land on handoff as real projects. Planning a project (or the
+  "Put this project on handoff" button) creates a team, which
+  auto-opens the linked request, then proposes the plan's tasks under
+  it; the board links https://handoff.lol/project/<slug>. A signed-in
+  visitor's token (sent with the plan call, used once, never stored)
+  makes the visitor the requester; without one the mirror is signed
+  as amuse. A failed mirror never fails the plan — the error shows
+  on the board for retry.
+
+## v1.2.2 (2026-11-05)
+
+- Sign-in panel fix: the bundle ships no handoff.css, so handoff's
+  own panel used to render as an unstyled block below the page while
+  the header stuck on "Opening handoff's sign-in panel…". The panel's
+  overlay layout now lives in the bundle, and the sign-in button
+  stays in place, so closing the panel leaves a working button.
+
 ## v1.2.0 (2026-11-05)
 
 - The avatar is a small logo mark at the bottom of the page (curly

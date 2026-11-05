@@ -37,9 +37,10 @@
 //   ZUCK_TEST=1 ZUCK_PORT=8105 node zuck-server.mjs
 import { createServer } from 'node:http';
 import { readFileSync, writeFileSync, renameSync, existsSync, unlinkSync } from 'node:fs';
-import { randomBytes } from 'node:crypto';
+import { randomBytes, createHash, createPrivateKey, sign as edSign } from 'node:crypto';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { homedir } from 'node:os';
 import { execFile } from 'node:child_process';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -120,6 +121,82 @@ async function verifyHandoffToken(token) {
     if (name) return String(name).slice(0, 60);
   }
   return null;
+}
+// ---------- mirror a plan to handoff as a real project ----------
+// A plan becomes a real handoff project: a team (which auto-opens the
+// linked request) plus the plan's tasks proposed under it. The board then
+// links to https://handoff.lol/project/<slug>. A visitor token, when the
+// browser sends one with the plan call, is used for that one mirror only
+// and proves the visitor as the project's requester — never stored, never
+// logged, never written to state. Without a visitor token the mirror is
+// signed as amuse, so the project is amuse's. Mirror failure never fails
+// the plan itself: the error is recorded on the project for retry.
+const HANDOFF_API = process.env.HANDOFF_API_BASE || 'https://handoff.lol';
+const SIG_KEY_PATH = process.env.HANDOFF_SIG_KEY || join(homedir(), '.handoff-lol', 'sig_privkey');
+function curlHandoff(method, path, bodyObj, auth) {
+  return new Promise((resolve) => {
+    const body = bodyObj ? JSON.stringify(bodyObj) : '';
+    const cfg = join(HERE, '.zuck-handoff-' + tok(4));
+    const lines = ['silent = true', 'max-time = 15', 'request = "' + method + '"'];
+    try {
+      if (auth && auth.bearer) {
+        lines.push('header = "Authorization: Bearer ' + String(auth.bearer).replace(/["\\\n\r]/g, '') + '"');
+      } else {
+        const ts = Date.now();
+        const bodyHash = createHash('sha256').update(body).digest('hex');
+        const stmt = 'handoff-signed-req\namuse\n' + method + '\n' + path + '\n' + ts + '\n' + bodyHash;
+        const privB64 = readFileSync(SIG_KEY_PATH, 'utf8').trim();
+        const key = createPrivateKey({ key: Buffer.from(privB64, 'base64'), format: 'der', type: 'pkcs8' });
+        const sig = edSign(null, Buffer.from(stmt, 'utf8'), key).toString('base64');
+        lines.push('header = "X-Agent-Id: amuse"');
+        lines.push('header = "X-Signature: ' + sig + '"');
+        lines.push('header = "X-Timestamp: ' + ts + '"');
+      }
+      if (body) lines.push('header = "Content-Type: application/json"');
+      writeFileSync(cfg, lines.join('\n') + '\n', { mode: 0o600 });
+    } catch { return resolve(null); }
+    const args = ['-s', '-A', UA, '-K', cfg, HANDOFF_API + path];
+    if (body) args.push('-d', body);
+    execFile('curl', args, { maxBuffer: 1024 * 1024 }, (err, stdout) => {
+      try { unlinkSync(cfg); } catch {}
+      if (err) return resolve(null);
+      resolve(tolerantParse(stdout));
+    });
+  });
+}
+async function mirrorProject(p, visitorToken) {
+  if (!p.plan) return { ok: false, error: 'plan it first' };
+  if (p.handoff && p.handoff.slug) return { ok: true, handoff: p.handoff };
+  const title = titleOf(p.request);
+  let auth, createdBy;
+  if (visitorToken) {
+    const username = await verifyHandoffToken(visitorToken);
+    if (!username) return { ok: false, error: 'handoff did not accept that sign-in — sign in again and retry' };
+    auth = { bearer: visitorToken }; createdBy = username;
+  } else {
+    auth = null; createdBy = 'amuse';
+  }
+  const team = await curlHandoff('POST', '/api/v1/teams', { created_by: createdBy, goal: title }, auth);
+  if (!team || !team.success || !team.team || !team.team.request_id) {
+    const err = { error: 'handoff did not open the project — retry from the board' };
+    p.handoff = err; save();
+    return { ok: false, error: err.error };
+  }
+  const req = await curlHandoff('GET', '/api/v1/requests/' + team.team.request_id, null, auth);
+  const slug = req && req.success && req.request && req.request.slug;
+  if (!slug) {
+    const err = { error: 'handoff opened the project but gave no address — retry from the board' };
+    p.handoff = err; save();
+    return { ok: false, error: err.error };
+  }
+  const tasks = p.plan.tasks.map((t) => ({ title: t.title }));
+  const planRes = await curlHandoff('POST', '/api/v1/teams/' + team.team.id + '/plan', { team_id: team.team.id, tasks }, auth);
+  const handoff = { team_id: team.team.id, request_id: team.team.request_id, slug,
+    url: 'https://handoff.lol/project/' + slug, requester: createdBy,
+    plan_proposed: !!(planRes && planRes.success), mirrored_at: nowIso() };
+  if (!handoff.plan_proposed) handoff.plan_error = 'the plan tasks did not land on handoff — the project link still works';
+  p.handoff = handoff; save();
+  return { ok: true, handoff };
 }
 function sessionProjects(sid) {
   return Object.values(state.projects)
@@ -207,7 +284,7 @@ function publicProject(p) {
     id: p.id, request: p.request, answers: p.answers, qi: p.qi,
     question: p.qi < DIMS.length ? DIMS[p.qi].q : null,
     unknowns: DIMS.slice(p.qi).map((d) => d.dim),
-    status: p.status, plan: p.plan, created_at: p.created_at,
+    status: p.status, plan: p.plan, created_at: p.created_at, handoff: p.handoff || null,
   };
 }
 
@@ -308,7 +385,7 @@ export function createZuckHandler() {
       if (!p || (p.owner && p.owner !== sid)) { json(404, { ok: false, error: 'no such project' }); return true; }
       json(200, { ok: true, project: publicProject(p) }); return true;
     }
-    if (req.method !== 'POST' || !['/zuck/start', '/zuck/answer', '/zuck/plan', '/zuck/run', '/zuck/confirm', '/zuck/session-start', '/zuck/session', '/zuck/signout'].includes(path)) {
+    if (req.method !== 'POST' || !['/zuck/start', '/zuck/answer', '/zuck/plan', '/zuck/run', '/zuck/confirm', '/zuck/mirror', '/zuck/session-start', '/zuck/session', '/zuck/signout'].includes(path)) {
       json(404, { ok: false, error: 'no such zuck action' }); return true;
     }
     const body = await readBody(req, 65536);
@@ -326,7 +403,7 @@ export function createZuckHandler() {
     }
     // Auth actions carry no project; only the project actions look one up.
     let p = null;
-    if (['/zuck/answer', '/zuck/plan', '/zuck/run', '/zuck/confirm'].includes(path)) {
+    if (['/zuck/answer', '/zuck/plan', '/zuck/run', '/zuck/confirm', '/zuck/mirror'].includes(path)) {
       p = state.projects[String(j.pid || '')];
       if (!p) { json(404, { ok: false, error: 'no such project — start one first' }); return true; }
       if (p.owner && p.owner !== String(j.sid || '')) { json(403, { ok: false, error: 'that project belongs to another signed-in user' }); return true; }
@@ -349,6 +426,16 @@ export function createZuckHandler() {
       p.plan = buildPlan(p);
       p.status = 'planned';
       save();
+      const token = String(j.token || '').slice(0, 2000);
+      await mirrorProject(p, token || null);
+      json(200, { ok: true, project: publicProject(p) }); return true;
+    }
+    if (path === '/zuck/mirror') {
+      if (!rateOk(ip, 'mirror', 10, 3600e3)) { json(429, { ok: false, error: 'slow down a little' }); return true; }
+      if (!p.plan) { json(200, { ok: false, error: 'plan it first' }); return true; }
+      const token = String(j.token || '').slice(0, 2000);
+      const m = await mirrorProject(p, token || null);
+      if (!m.ok) { json(200, { ok: false, error: m.error, project: publicProject(p) }); return true; }
       json(200, { ok: true, project: publicProject(p) }); return true;
     }
     if (path === '/zuck/run') {
